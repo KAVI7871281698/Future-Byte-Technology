@@ -7,8 +7,9 @@ services:
 
     command: gunicorn myproject.wsgi:application --bind 0.0.0.0:8000 --workers 2
 
-    env_file:
-      - /home/ubuntu/.futurebyte.env
+    environment:
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-False}
 
     ports:
       - "127.0.0.1:8000:8000"

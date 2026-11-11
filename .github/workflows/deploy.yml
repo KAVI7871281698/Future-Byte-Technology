@@ -15,27 +15,38 @@ jobs:
     runs-on: self-hosted
 
     steps:
-      - name: Deploy application on EC2
+      - name: Deploy Django with Docker
         shell: bash
+        env:
+          DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
+          DJANGO_DEBUG: ${{ secrets.DJANGO_DEBUG }}
         run: |
-          set -e
+          set -euo pipefail
 
           cd /home/ubuntu/projects/Future-Byte-Technology
 
-          echo "Fetching latest code..."
+          echo "Pulling latest code..."
           git fetch origin main
           git reset --hard origin/main
 
           cd myproject
 
-          echo "Installing dependencies..."
-          source venv/bin/activate
-          pip install -r requirements.txt
+          echo "Checking Docker..."
+          docker compose version
+
+          echo "Building Docker image..."
+          docker compose build
 
           echo "Running database migrations..."
-          python manage.py migrate --noinput
+          docker compose run --rm web python manage.py migrate --noinput
 
           echo "Collecting static files..."
-          python manage.py collectstatic --noinput
+          docker compose run --rm web python manage.py collectstatic --noinput
 
-          echo "Deployment commands completed."
+          echo "Starting application..."
+          docker compose up -d
+
+          echo "Checking application..."
+          docker compose ps
+
+          echo "Deployment completed successfully!"
