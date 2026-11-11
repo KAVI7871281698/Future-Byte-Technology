@@ -1,0 +1,41 @@
+
+name: Deploy Django to AWS EC2
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+
+    steps:
+      - name: Deploy application on EC2
+        shell: bash
+        run: |
+          set -e
+
+          cd /home/ubuntu/projects/Future-Byte-Technology
+
+          echo "Fetching latest code..."
+          git fetch origin main
+          git reset --hard origin/main
+
+          cd myproject
+
+          echo "Installing dependencies..."
+          source venv/bin/activate
+          pip install -r requirements.txt
+
+          echo "Running database migrations..."
+          python manage.py migrate --noinput
+
+          echo "Collecting static files..."
+          python manage.py collectstatic --noinput
+
+          echo "Deployment commands completed."
