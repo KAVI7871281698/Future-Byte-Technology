@@ -13,12 +13,24 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # SECURITY SETTINGS
 # --------------------------------------------------
 
-SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY")
+# Auto-load .env file if present in project root
+env_file = BASE_DIR / ".env"
+if env_file.exists():
+    with open(env_file, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                key, val = line.split("=", 1)
+                os.environ.setdefault(key.strip(), val.strip().strip("'\""))
 
-if not SECRET_KEY:
-    raise ValueError("DJANGO_SECRET_KEY environment variable is not set.")
+# Fallback development key if not specified in environment
+SECRET_KEY = os.environ.get(
+    "DJANGO_SECRET_KEY",
+    "django-insecure-dev-key-futurebyte-change-in-production-9876543210!@#$%",
+)
 
-DEBUG = os.environ.get("DJANGO_DEBUG", "False").lower() == "true"
+# Defaults to True for local development; Docker Compose sets DJANGO_DEBUG explicitly
+DEBUG = os.environ.get("DJANGO_DEBUG", "True").lower() == "true"
 
 ALLOWED_HOSTS = [
     "futurebyte-technology.duckdns.org",
