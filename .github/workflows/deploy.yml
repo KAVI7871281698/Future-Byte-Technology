@@ -5,48 +5,98 @@ on:
   push:
     branches:
       - main
+
   workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: production-deployment
+  cancel-in-progress: false
+
 jobs:
   deploy:
-    runs-on: self-hosted
+    name: Deploy Django with Docker
+    runs-on: [self-hosted, linux, x64]
 
     steps:
-      - name: Deploy Django with Docker
+      # Step 1: Deploy application
+      - name: Deploy Django application
         shell: bash
         env:
           DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
           DJANGO_DEBUG: ${{ secrets.DJANGO_DEBUG }}
-        run: |
-          set -euo pipefail
 
+        run: |
+          set -Eeuo pipefail
+
+          echo "================================"
+          echo "Starting Django deployment"
+          echo "================================"
+
+          # Verify required secrets
+          if [ -z "${DJANGO_SECRET_KEY:-}" ]; then
+            echo "ERROR: DJANGO_SECRET_KEY is missing."
+            exit 1
+          fi
+
+          export DJANGO_SECRET_KEY
+          export DJANGO_DEBUG="${DJANGO_DEBUG:-False}"
+
+          # Navigate to project repository on AWS
           cd /home/ubuntu/projects/Future-Byte-Technology
 
-          echo "Pulling latest code..."
+          echo "Fetching latest GitHub code..."
+
           git fetch origin main
           git reset --hard origin/main
 
+          # Navigate to Django project
           cd myproject
 
-          echo "Checking Docker..."
+          echo "Checking Docker installation..."
+
+          docker --version
           docker compose version
 
           echo "Building Docker image..."
+
           docker compose build
 
-          echo "Running database migrations..."
+          echo "Running Django database migrations..."
+
           docker compose run --rm web python manage.py migrate --noinput
 
-          echo "Collecting static files..."
+          echo "Collecting Django static files..."
+
           docker compose run --rm web python manage.py collectstatic --noinput
 
-          echo "Starting application..."
-          docker compose up -d
+          echo "Starting Docker application..."
 
-          echo "Checking application..."
+          docker compose up -d --remove-orphans
+
+          echo "Checking Docker containers..."
+
           docker compose ps
 
-          echo "Deployment completed successfully!"
+          echo "Checking application response..."
+
+          for i in {1..15}; do
+            if curl --fail --silent http://127.0.0.1:8000/ > /dev/null; then
+              echo "Application is responding successfully."
+              break
+            fi
+
+            if [ "$i" -eq 15 ]; then
+              echo "ERROR: Application did not respond."
+              docker compose logs --tail=100 web
+              exit 1
+            fi
+
+            sleep 2
+          done
+
+          echo "================================"
+          echo "DEPLOYMENT SUCCESSFUL"
+          echo "================================"
